@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insta360 Track Explorer</title>
+    
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Sidebar -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-sidebar-v2@3.2.3/css/leaflet-sidebar.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-sidebar-v2@3.2.3/js/leaflet-sidebar.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        :root {
+            --color-primary: #2c5f2d;
+            --color-secondary: #97bc62;
+            --color-accent: #e8a838;
+            --color-dark: #1a1a2e;
+            --color-panel: #f5f5f0;
+            --color-text: #333;
+            --color-text-light: #666;
+            --sidebar-width: 320px;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--color-dark);
+            color: var(--color-text);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* ========== LAYOUT ========== */
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        /* ========== SIDEBAR ========== */
+        #sidebar {
+            width: var(--sidebar-width);
+            background: var(--color-panel);
+            border-right: 3px solid var(--color-primary);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.3);
+        }
+        
+        .sidebar-header {
+            background: var(--color-primary);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .sidebar-header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .sidebar-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .sidebar-section {
+            padding: 18px 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .sidebar-section h3 {
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* ========== VIDEO PANEL ========== */
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .video-wrapper video {
+            width: 100%;
+            display: block;
+            border-radius: 8px;
+        }
+        
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: 30px 12px 10px;
+            color: white;
+        }
+        
+        .video-time {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .video-point {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        /* Timeline */
+        .timeline-container {
+            margin-top: 10px;
+        }
+        
+        #timeline {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: #ccc;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        #timeline::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        
+        .time-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--color-text-light);
+            margin-top: 4px;
+        }
+        
+        /* ========== CONTROLES ========== */
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1e4420;
+        }
+        
+        .btn-secondary {
+            background: #e0e0d8;
+            color: var(--color-text);
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0c8;
+        }
+        
+        /* ========== CAPAS ========== */
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .layer-item:hover {
+            opacity: 0.7;
+        }
+        
+        .layer-icon {
+            width: 24px;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .layer-name {
+            font-size: 0.9rem;
+        }
+        
+        .layer-toggle {
+            margin-left: auto;
+            width: 36px;
+            height: 20px;
+            background: #ccc;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .layer-toggle.active {
+            background: var(--color-secondary);
+        }
+        
+        .layer-toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .layer-toggle.active::after {
+            transform: translateX(16px);
+        }
+        
+        /* ========== INFO PANEL ========== */
+        .info-box {
+            background: white;
+            border-left: 4px solid var(--color-accent);
+            padding: 12px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        
+        .info-box strong {
+            color: var(--color-primary);
+        }
+        
+        /* ========== MAPA ========== */
+        #map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* ========== POPUP ESTILO FUELBREAKS ========== */
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .custom-popup .leaflet-popup-content {
+            margin: 0;
+            padding: 0;
+            width: 280px !important;
+        }
+        
+        .popup-header {
+            background: var(--color-primary);
+            color: white;
+            padding: 12px 16px;
+            font-weight: 600;
+        }
+        
+        .popup-body {
+            padding: 16px;
+        }
+        
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        
+        .popup-row:last-child {
+            border-bottom: none;
+        }
+        
+        .popup-label {
+            color: var(--color-text-light);
+        }
+        
+        .popup-value {
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+        
+        .popup-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .popup-btn:hover {
+            background: #d4952f;
+        }
+        
+        /* ========== LEYENDA ========== */
+        .legend-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+            z-index: 500;
+            min-width: 180px;
+        }
+        
+        .legend-panel h4 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-primary);
+            margin-bottom: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            font-size: 0.8rem;
+        }
+        
+        .legend-symbol {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* ========== MINIATURA DEL VIDEO EN POPUP ========== */
+        .popup-thumb {
+            width: 100%;
+            height: 120px;
+            background: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+        }
+        
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: absolute;
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+                height: 100%;
+            }
+            
+            #sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .menu-toggle {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                z-index: 1001;
+                background: var(--color-primary);
+                color: white;
+                border: none;
+                padding: 10px 14px;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+        }
+        
+        /* ========== SCROLLBAR ========== */
+        #sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        #sidebar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        #sidebar::-webkit-scrollbar-thumb {
+            background: var(--color-secondary);
+            border-radius: 3px;
+        }
+        
+        /* ========== STATS ========== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            border-top: 3px solid var(--color-secondary);
+        }
+        
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--color-text-light);
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- SIDEBAR -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-video"></i> Insta360 Explorer</h1>
+                <p>Recorrido georreferenciado</p>
+            </div>
+            
+            <!-- VIDEO SECTION -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-play-circle"></i> Video</h3>
+                <div class="video-wrapper">
+                    <video id="video" preload="metadata">
+                        <!-- REEMPLAZAR con tu video -->
+                        <source src="video/insta360.mp4" type="video/mp4">
+                        <!-- Fallback: video de demo -->
+                        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+                    </video>
+                    <div class="video-overlay">
+                        <div class="video-time" id="video-time">00:00</div>
+                        <div class="video-point" id="video-point">Punto inicial</div>
+                    </div>
+                </div>
+                
+                <div class="timeline-container">
+                    <input type="range" id="timeline" min="0" max="100" value="0" step="0.1">
+                    <div class="time-labels">
+                        <span id="time-start">00:00</span>
+                        <span id="time-end">00:00</span>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button class="btn btn-primary" id="btn-play">
+                        <i class="fas fa-play"></i> Play
+                    </button>
+                    <button class="btn btn-secondary" id="btn-reset">
+                        <i class="fas fa-undo"></i> Reset
+                    </button>
+                </div>
+            </div>
+            
+            <!-- STATS -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-distance">0</div>
+                        <div class="stat-label">km recorridos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-duration">0</div>
+                        <div class="stat-label">minutos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-points">0</div>
+                        <div class="stat-label">puntos GPS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-speed">0</div>
+                        <div class="stat-label">km/h promedio</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CAPAS -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-layer-group"></i> Capas</h3>
+                <div class="layer-item" onclick="toggleLayer('track')">
+                    <div class="layer-icon" style="background: var(--color-primary);"></div>
+                    <span class="layer-name">Track GPS</span>
+                    <div class="layer-toggle active" id="layer-track"></div>
+                </div>
+                <div class="layer-item" onclick="toggleLayer('points')">
+                    <div class="layer-icon" style="background: var(--color-accent);"></div>
+                    <span class="layer-name">Puntos de interés</span>
+                    <div class="layer-toggle active" id="layer-points"></div>
+                </div>
+                <div class="layer-item" onclick="toggleLayer('heatmap')">
+                    <div class="layer-icon" style="background: #ff6b6b;"></div>
+                    <span class="layer-name">Heatmap de velocidad</span>
+                    <div class="layer-toggle" id="layer-heatmap"></div>
+                </div>
+            </div>
+            
+            <!-- INFO -->
+            <div class="sidebar-section">
+                <h3><i class="fas fa-info-circle"></i> Información</h3>
+                <div class="info-box">
+                    <strong>💡 Cómo usar:</strong><br>
+                    • Hacé click en cualquier punto del mapa para saltar a ese momento del video.<br>
+                    • Mové el slider para navegar manualmente.<br>
+                    • El punto amarillo indica tu posición actual en el recorrido.
+                </div>
+            </div>
+            
+            <!-- FOOTER -->
+            <div class="sidebar-section" style="margin-top: auto; border-bottom: none; text-align: center; font-size: 0.75rem; color: var(--color-text-light);">
+                <i class="fas fa-map-marked-alt"></i> Generado con Leaflet + Insta360
+            </div>
+        </aside>
+        
+        <!-- MAPA -->
+        <div id="map-container">
+            <div id="map"></div>
+            
+            <!-- Leyenda flotante -->
+            <div class="legend-panel">
+                <h4>Leyenda</h4>
+                <div class="legend-item">
+                    <div class="legend-symbol">
+                        <div style="width: 20px; height: 3px; background: var(--color-primary); border-radius: 2px;"></div>
+                    </div>
+                    <span>Track recorrido</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol">
+                        <div style="width: 10px; height: 10px; background: var(--color-accent); border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px var(--color-accent);"></div>
+                    </div>
+                    <span>Posición actual</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-symbol">
+                        <div style="width: 8px; height: 8px; background: #666; border-radius: 50%;"></div>
+                    </div>
+                    <span>Puntos de muestreo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // CONFIGURACIÓN
+        // ============================================================
+        const CONFIG = {
+            center: [-34.6, -58.4], // Cambiar por tu ubicación
+            zoom: 14,
+            videoUrl: 'video/insta360.mp4',
+            trackUrl: 'data/track.geojson',
+            colors: {
+                track: '#2c5f2d',
+                current: '#e8a838',
+                points: '#666666',
+                highlight: '#97bc62'
+            }
+        };
+        
+        // ============================================================
+        // VARIABLES GLOBALES
+        // ============================================================
+        let map, video, timeline;
+        let trackLayer, pointsLayer, currentMarker;
+        let trackData = [];
+        let isPlaying = false;
+        let layers = { track: true, points: true, heatmap: false };
+        
+        // ============================================================
+        // INICIALIZACIÓN
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            initVideo();
+            loadTrack();
+            setupControls();
+        });
+        
+        // ============================================================
+        // MAPA
+        // ============================================================
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView(CONFIG.center, CONFIG.zoom);
+            
+            // Zoom en posición custom
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            L.control.attribution({ position: 'bottomright' }).addTo(map);
+            
+            // Capas base
+            const baseDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            });
+            
+            const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri',
+                maxZoom: 18
+            });
+            
+            const baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenTopoMap',
+                maxZoom: 17
+            });
+            
+            baseDark.addTo(map);
+            
+            // Control de capas
+            L.control.layers({
+                "Oscuro": baseDark,
+                "Satelital": baseSat,
+                "Topográfico": baseTopo
+            }, null, { position: 'topright', collapsed: true }).addTo(map);
+        }
+        
+        // ============================================================
+        // VIDEO
+        // ============================================================
+        function initVideo() {
+            video = document.getElementById('video');
+            timeline = document.getElementById('timeline');
+            
+            video.addEventListener('loadedmetadata', () => {
+                timeline.max = video.duration;
+                document.getElementById('time-end').textContent = formatTime(video.duration);
+                document.getElementById('stat-duration').textContent = Math.round(video.duration / 60);
+            });
+            
+            timeline.addEventListener('input', (e) => {
+                video.currentTime = parseFloat(e.target.value);
+                updateFromVideo();
+            });
+            
+            video.addEventListener('timeupdate', () => {
+                timeline.value = video.currentTime;
+                document.getElementById('video-time').textContent = formatTime(video.currentTime);
+                updateFromVideo();
+            });
+            
+            video.addEventListener('play', () => {
+                isPlaying = true;
+                document.getElementById('btn-play').innerHTML = '<i class="fas fa-pause"></i> Pause';
+            });
+            
+            video.addEventListener('pause', () => {
+                isPlaying = false;
+                document.getElementById('btn-play').innerHTML = '<i class="fas fa-play"></i> Play';
+            });
+        }
+        
+        // ============================================================
+        // CONTROLES
+        // ============================================================
+        function setupControls() {
+            document.getElementById('btn-play').addEventListener('click', () => {
+                video.paused ? video.play() : video.pause();
+            });
+            
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                video.currentTime = 0;
+                video.pause();
+                if (trackData.length > 0) {
+                    map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
+                }
+            });
+        }
+        
+        // ============================================================
+        // CARGAR TRACK
+        // ============================================================
+        async function loadTrack() {
+            try {
+                const response = await fetch(CONFIG.trackUrl);
+                const geojson = await response.json();
+                processTrack(geojson);
+            } catch (e) {
+                console.warn('No se encontró track.geojson, usando demo...');
+                loadDemoTrack();
+            }
+        }
+        
+        function processTrack(geojson) {
+            trackData = geojson.features.map((f, i) => ({
+                index: i,
+                lat: f.geometry.coordinates[1],
+                lon: f.geometry.coordinates[0],
+                videoTime: f.properties.video_time || (i * 0.5),
+                elevation: f.properties.elevation || 0,
+                time: f.properties.time || null
+            }));
+            
+            document.getElementById('stat-points').textContent = trackData.length;
+            
+            // Calcular distancia total
+            let totalDist = 0;
+            for (let i = 1; i < trackData.length; i++) {
+                totalDist += L.latLng(trackData[i-1].lat, trackData[i-1].lon)
+                    .distanceTo([trackData[i].lat, trackData[i].lon]);
+            }
+            document.getElementById('stat-distance').textContent = (totalDist / 1000).toFixed(1);
+            
+            // Velocidad promedio (aprox)
+            const duration = trackData[trackData.length - 1].videoTime / 3600; // horas
+            const speed = duration > 0 ? (totalDist / 1000) / duration : 0;
+            document.getElementById('stat-speed').textContent = speed.toFixed(1);
+            
+            drawTrack();
+            drawPoints();
+        }
+        
+        // ============================================================
+        // DIBUJAR TRACK
+        // ============================================================
+        function drawTrack() {
+            const latlngs = trackData.map(p => [p.lat, p.lon]);
+            
+            trackLayer = L.polyline(latlngs, {
+                color: CONFIG.colors.track,
+                weight: 4,
+                opacity: 0.85,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map);
+            
+            // Sombra del track
+            L.polyline(latlngs, {
+                color: '#000',
+                weight: 8,
+                opacity: 0.2,
+                lineCap: 'round'
+            }).addTo(map).bringToBack();
+            
+            map.fitBounds(trackLayer.getBounds(), { padding: [80, 80] });
+        }
+        
+        // ============================================================
+        // DIBUJAR PUNTOS CLICKEABLES
+        // ============================================================
+        function drawPoints() {
+            const step = Math.max(1, Math.floor(trackData.length / 150));
+            
+            const features = trackData.filter((_, i) => i % step === 0).map(p => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [p.lon, p.lat]
+                },
+                properties: {
+                    videoTime: p.videoTime,
+                    index: p.index,
+                    lat: p.lat,
+                    lon: p.lon
+                }
+            }));
+            
+            pointsLayer = L.geoJSON({
+                type: 'FeatureCollection',
+                features: features
+            }, {
+                pointToLayer: (feature, latlng) => {
+                    return L.circleMarker(latlng, {
+                        radius: 5,
+                        fillColor: CONFIG.colors.points,
+                        color: '#fff',
+                        weight: 1,
+                        opacity: 0.7,
+                        fillOpacity: 0.5
+                    });
+                },
+                onEachFeature: (feature, layer) => {
+                    const t = feature.properties.videoTime;
+                    
+                    layer.bindPopup(`
+                        <div class="popup-header">
+                            <i class="fas fa-map-pin"></i> Punto #${feature.properties.index}
+                        </div>
+                        <div class="popup-body">
+                            <div class="popup-row">
+                                <span class="popup-label">Tiempo video</span>
+                                <span class="popup-value">${formatTime(t)}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Latitud</span>
+                                <span class="popup-value">${feature.properties.lat.toFixed(5)}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Longitud</span>
+                                <span class="popup-value">${feature.properties.lon.toFixed(5)}</span>
+                            </div>
+                            <button class="popup-btn" onclick="jumpToTime(${t})">
+                                <i class="fas fa-play"></i> Ver este momento
+                            </button>
+                        </div>
+                    `, {
+                        className: 'custom-popup',
+                        closeButton: false
+                    });
+                    
+                    layer.on('click', () => jumpToTime(t));
+                    
+                    // Hover effect
+                    layer.on('mouseover', function() {
+                        this.setStyle({ fillColor: CONFIG.colors.highlight, fillOpacity: 0.8, radius: 7 });
+                    });
+                    layer.on('mouseout', function() {
+                        this.setStyle({ fillColor: CONFIG.colors.points, fillOpacity: 0.5, radius: 5 });
+                    });
+                }
+            }).addTo(map);
+        }
+        
+        // ============================================================
+        // SINCRONIZACIÓN
+        // ============================================================
+        function jumpToTime(seconds) {
+            video.currentTime = seconds;
+            video.play();
+            updateFromVideo();
+            
+            // Cerrar popups abiertos
+            map.closePopup();
+        }
+        
+        function updateFromVideo() {
+            const t = video.currentTime;
+            const point = findClosestPoint(t);
+            
+            if (!point) return;
+            
+            // Actualizar marcador actual
+            if (currentMarker) map.removeLayer(currentMarker);
+            
+            currentMarker = L.circleMarker([point.lat, point.lon], {
+                radius: 10,
+                fillColor: CONFIG.colors.current,
+                color: '#fff',
+                weight: 3,
+                opacity: 1,
+                fillOpacity: 0.9,
+                className: 'pulse-marker'
+            }).addTo(map);
+            
+            // Animación CSS para el marcador
+            if (!document.getElementById('pulse-style')) {
+                const style = document.createElement('style');
+                style.id = 'pulse-style';
+                style.textContent = `
+                    .pulse-marker {
+                        animation: pulse 1.5s infinite;
+                    }
+                    @keyframes pulse {
+                        0% { stroke-width: 3; stroke-opacity: 1; }
+                        50% { stroke-width: 8; stroke-opacity: 0.3; }
+                        100% { stroke-width: 3; stroke-opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Info en sidebar
+            document.getElementById('video-point').textContent = 
+                `Punto #${point.index} · ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`;
+            
+            // Centrar mapa suavemente si está lejos
+            const center = map.getCenter();
+            const dist = center.distanceTo([point.lat, point.lon]);
+            if (dist > 300) {
+                map.panTo([point.lat, point.lon], { animate: true, duration: 0.5 });
+            }
+        }
+        
+        function findClosestPoint(videoTime) {
+            if (trackData.length === 0) return null;
+            
+            let left = 0, right = trackData.length - 1;
+            while (left < right) {
+                const mid = Math.floor((left + right) / 2);
+                if (trackData[mid].videoTime < videoTime) left = mid + 1;
+                else right = mid;
+            }
+            
+            if (left > 0) {
+                const prev = trackData[left - 1];
+                const curr = trackData[left];
+                return Math.abs(prev.videoTime - videoTime) < Math.abs(curr.videoTime - videoTime) 
+                    ? prev : curr;
+            }
+            return trackData[left];
+        }
+        
+        // ============================================================
+        // TOGGLE CAPAS
+        // ============================================================
+        function toggleLayer(name) {
+            layers[name] = !layers[name];
+            document.getElementById(`layer-${name}`).classList.toggle('active');
+            
+            if (name === 'track' && trackLayer) {
+                layers[name] ? map.addLayer(trackLayer) : map.removeLayer(trackLayer);
+            }
+            if (name === 'points' && pointsLayer) {
+                layers[name] ? map.addLayer(pointsLayer) : map.removeLayer(pointsLayer);
+            }
+        }
+        
+        // ============================================================
+        // DEMO TRACK (fallback)
+        // ============================================================
+        function loadDemoTrack() {
+            const center = CONFIG.center;
+            const points = 200;
+            trackData = [];
+            
+            for (let i = 0; i < points; i++) {
+                const angle = (i / points) * Math.PI * 4;
+                const r = 0.01 + (i / points) * 0.02;
+                trackData.push({
+                    index: i,
+                    lat: center[0] + r * Math.cos(angle),
+                    lon: center[1] + r * Math.sin(angle) * 0.7,
+                    videoTime: i * 0.3,
+                    elevation: Math.random() * 100
+                });
+            }
+            
+            processTrack({
+                type: 'FeatureCollection',
+                features: trackData.map(p => ({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+                    properties: { video_time: p.videoTime, elevation: p.elevation }
+                }))
+            });
+        }
+        
+        // ============================================================
+        // UTILIDADES
+        // ============================================================
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
